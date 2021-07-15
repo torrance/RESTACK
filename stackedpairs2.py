@@ -108,6 +108,9 @@ def makestack(x1, y1, x2, y2, imgshr, imgshape, stackshr, stackshape):
     with writelock:
         stack[:] += img
 
+    imgshr.close()
+    stackshr.close()
+
     return None
 
 
@@ -303,7 +306,11 @@ stackedHDU.data = (stackedweightsshrnd).T
 stackedHDU.writeto(args.prefix + "-weights.fits", overwrite=True)
 np.save(args.prefix + "-LRGindex.npy", LRGindex)
 
+residualshr.close()
 residualshr.unlink()
+weightshr.close()
 weightshr.unlink()
+stackedshr.close()
 stackedshr.unlink()
-stackedweightshr.unlink()
+stackedweightsshr.close()
+stackedweightsshr.unlink()
