@@ -16,7 +16,7 @@ from astropy.units import Quantity
 from astropy.wcs import WCS
 from astropy.wcs.utils import skycoord_to_pixel
 import numpy as np
-from scipy.interpolate import interp2d, griddata, RectBivariateSpline, RegularGridInterpolator
+from scipy.interpolate import RegularGridInterpolator
 from scipy.ndimage import rotate, zoom
 from scipy.signal import fftconvolve
 
@@ -116,6 +116,7 @@ def makestack(x1, y1, x2, y2, imgshr, imgshape, stackshr, stackshape):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--image", required=True)
+parser.add_argument("--weight", required=True)
 parser.add_argument("--lrgpairs", required=True)
 parser.add_argument("--prefix", required=True)
 parser.add_argument("--resume", action="store_true")
@@ -139,8 +140,8 @@ coords2_px = skycoord_to_pixel(coords2, wcs)
 
 # Set maxrpx
 rs_px = np.sqrt((coords1_px[0] - coords2_px[0])**2 + (coords1_px[1] - coords2_px[1])**2)
-maxrpx = max(rs_px)
-minrpx = min(rs_px)
+maxrpx = np.nanmax(rs_px)
+minrpx = np.nanmin(rs_px)
 
 print("Maximum distance:", maxrpx)
 print("Minimum distance:", minrpx)
@@ -165,7 +166,7 @@ if args.resume:
     N = stackedHDU.header["NITER"]
 else:
     # Create the stacked image template
-    stacked = np.zeros((int(4 * maxrpx), int(4* maxrpx)))
+    stacked = np.zeros((int(4 * maxrpx), int(4 * maxrpx)))
     stackedweights = np.zeros_like(stacked)
 
     stackedHDU = fits.PrimaryHDU(data=stacked.copy())
@@ -183,9 +184,8 @@ stackedx0, stackedy0 = stacked.shape[0] // 2, stacked.shape[1] // 2
 print("Stacked shape:", stacked.shape, "stackedx0:", stackedx0, "stackedy0:", stackedy0)
 
 # Load residual and weight images
-prefix = args.image[:-len("-restored-fluxxed.fits")]
-_residual = np.squeeze(fits.open(prefix + "-residuals-fluxxed.fits")[0].data).T
-_beamweight = np.sqrt(np.squeeze(fits.open(prefix + "-weight-fluxxed.fits")[0].data).T)
+_residual = np.squeeze(fits.open(args.image)[0].data).T
+_beamweight = np.sqrt(np.squeeze(fits.open(args.weight)[0].data).T)
 
 # Turn fits arrays into real numpy arrays
 residual = np.empty(_residual.shape)
@@ -245,6 +245,9 @@ stackedweightsshrnd = np.ndarray(stackedweights.shape, dtype=stackedweights.dtyp
 stackedweightsshrnd[:] = stackedweights
 
 for k, (x1, y1, x2, y2) in enumerate(LRGs_px[kstart:], kstart):
+    if k % 2 == 0:
+        x1, y1, x2, y2 = x2, y2, x1, y1
+
     print("\nProgress: %.1f%%" % (100 * k / len(LRGs_px)), "N:", N)
     print("Coords:", (x1, y1), (x2, y2))
 
